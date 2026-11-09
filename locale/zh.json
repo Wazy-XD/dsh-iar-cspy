@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "IAR C-SPY 调试器",
+    "description": "接入官方 IAR C-SPY MCP Server 并注册 iar-cspy 技能，让 agent 能构建 Embedded Workbench 工程，并在模拟器或硬件探针上调试。"
+  }
+}

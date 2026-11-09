@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="IAR C-SPY debugger">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6feb"/>
+      <stop offset="1" stop-color="#0b3d91"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#g)"/>
+  <g stroke="#cfe3ff" stroke-width="2.5" stroke-linecap="round" fill="none">
+    <rect x="18" y="18" width="20" height="20" rx="4"/>
+    <path d="M23 18v-6M33 18v-6M18 23h-6M18 33h-6M38 23h6M38 33h6M23 38v6M33 38v6"/>
+  </g>
+  <circle cx="42" cy="42" r="7" fill="none" stroke="#ffd166" stroke-width="3"/>
+  <path d="M47 47l7 7" stroke="#ffd166" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

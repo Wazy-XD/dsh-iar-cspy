@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "IAR C-SPY debugger",
+    "description": "Connects the official IAR C-SPY MCP server and adds the iar-cspy skill, so the agent can build Embedded Workbench projects and debug them on the simulator or a hardware probe."
+  }
+}

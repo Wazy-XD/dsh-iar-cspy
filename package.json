@@ -1,0 +1,52 @@
+{
+  "name": "dsh-iar-cspy",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness bundle for the official IAR C-SPY MCP server: build, debug and inspect Embedded Workbench projects from the agent, plus an iar-cspy skill for the 9.x legacy quirks.",
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "mcp",
+    "iar",
+    "cspy",
+    "embedded",
+    "debugger",
+    "deepseek-harness"
+  ],
+  "type": "module",
+  "main": "./index.js",
+  "author": "Wazy-XD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wazy-XD/dsh-iar-cspy.git"
+  },
+  "homepage": "https://github.com/Wazy-XD/dsh-iar-cspy#readme",
+  "bugs": {
+    "url": "https://github.com/Wazy-XD/dsh-iar-cspy/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "scripts/*.ps1",
+    "launcher/**",
+    "README.md",
+    "README.zh.md",
+    "PARITY.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
