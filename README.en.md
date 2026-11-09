@@ -4,7 +4,7 @@
 
 ## Introduction
 
-`dsh-iar-cspy` 2.0.0 is a DeepSeek Harness (DSH) bundle for the official
+`dsh-iar-cspy` 2.1.0 is a DeepSeek Harness (DSH) bundle for the official
 [IAR C-SPY MCP server](https://github.com/iarsystems/cspy-mcp). Once installed, the
 agent can build IAR Embedded Workbench `.ewp` projects in the conversation, start
 C-SPY debug sessions on the simulator or a hardware probe, and inspect variables,
@@ -32,9 +32,8 @@ schema and page, the `iar-cspy` skill, and helper scripts such as
   automatically when a task mentions IAR, EWARM, C-SPY, `.ewp`/`.eww` or iarbuild.
   It covers the tool map, build and debug workflows, launch JSON, the EWARM
   9.60.2 limits and hardware safety.
-- **The configuration page**: DSH sidebar **Plugins → dsh-iar-cspy**, then
-  **Configure** on the `iar-cspy` row, for the IAR path, MCP Python, temporary
-  directory, timeout and extra arguments.
+- **The configuration page**: DSH sidebar **Plugins → dsh-iar-cspy**; the form
+  sits above the component list. Set the IAR path,
   Empty fields are auto-detected. Saving reloads the MCP connection automatically;
   no DSH restart is needed.
 - **The `iar_cspy_status` tool**: reports the resolved `iarPath`, `mcpPython`,
@@ -72,10 +71,10 @@ IAR VS Code extensions.
 Install the current version in DSH (the GitHub release tgz):
 
 ```
-plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.0.0/dsh-iar-cspy-2.0.0.tgz
+plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.1.0/dsh-iar-cspy-2.1.0.tgz
 ```
 
-A local tgz also works, as does `target=dsh-iar-cspy@2.0.0` once it is published
+A local tgz also works, as does `target=dsh-iar-cspy@2.1.0` once it is published
 to npm. After installation the bundle inserts two rows into the profile:
 `iar-cspy` (the host plugin) and `iar-cspy-mcp` (the MCP client).
 
@@ -121,9 +120,9 @@ and avoid `git clone`. The script deliberately keeps the private environment und
 
 ### 3. Configure in DSH
 
-Open the DSH sidebar **Plugins → dsh-iar-cspy**: edit the fields on the `iar-cspy`
-row's **Configure** page; the bundle detail page's **configuration** section provides
-the install/update command and notes. The fields:
+Open the DSH sidebar **Plugins → dsh-iar-cspy**: the configuration form sits above
+the component list; edit the fields and save. The same page carries the
+install/update button and notes. The fields:
 
 | Field | Purpose | When empty |
 | --- | --- | --- |

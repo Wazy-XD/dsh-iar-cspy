@@ -11,8 +11,9 @@
     With -Probe the script also starts and stops a managed CSpyServer2 through
     "iar_cspy_mcp --probe-cspyserver2".
 
-    Note: the DSH plugin configuration (Plugins page -> dsh-iar-cspy -> Configure)
-    overrides config.json. config.json is only the auto-detection fallback.
+    Note: the DSH plugin configuration (Plugins page -> dsh-iar-cspy -> the form
+    above the component list) overrides config.json. config.json is only the
+    auto-detection fallback.
 
 .PARAMETER IarPath
     Override the IAR root recorded in config.json for this run.
@@ -248,7 +249,7 @@ if ($Probe) {
 
 Write-Host ''
 Write-Host 'Plugin configuration' -ForegroundColor Cyan
-Write-Host '  The DSH plugin configuration (Plugins page -> dsh-iar-cspy -> Configure) overrides'
+Write-Host '  The DSH plugin configuration (Plugins page -> dsh-iar-cspy -> the form above the'
 Write-Host '  config.json. config.json is only the auto-detection fallback: if iarPath, mcpPython'
 Write-Host '  or tempDir are set there, these checks describe the fallback, not the running plugin.'
 Write-Host ''

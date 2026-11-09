@@ -11,6 +11,7 @@ const STATE_DIR = process.env.DSH_IAR_CSPY_HOME
   || (process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'dsh-iar-cspy') : join(process.env.HOME || process.env.USERPROFILE || '.', '.dsh-iar-cspy'))
 const SETUP_SCRIPT = fileURLToPath(new URL('./scripts/setup.ps1', import.meta.url))
 const PROVISION_PATH = '/dsh-iar-cspy/provision'
+const CONFIG_PATH = '/dsh-iar-cspy/config'
 
 export const Config = z.object({
   iarPath: z.string().default(''),
@@ -122,9 +123,10 @@ const SKILL = String.raw`# IAR C-SPY 调试器
 - 超时默认 600000 毫秒（10 分钟），因为真实工程构建经常超过 60 秒。
 
 如果 mcp__iar__* 工具不存在，先调用 iar_cspy_status 查看解析后的路径和缺失项；再让用户到
-DSH 侧边栏 Plugins -> dsh-iar-cspy，在 iar-cspy 行的 Configure 页检查路径。插件详情页和配置页
-都有“安装 / 更新 MCP”按钮，点击后宿主运行 setup.ps1、显示输出并自动重连；也可以手动运行
-插件包内的 scripts\setup.ps1。插件本身不安装 Python 包。
+DSH 侧边栏 Plugins -> dsh-iar-cspy 的配置表单检查路径（在插件页组件列表上方）。配置页有
+“安装 / 更新 MCP”按钮，点击后宿主运行 setup.ps1、显示输出并自动重连；也可以手动运行
+插件包内的 scripts\setup.ps1。插件本身不安装 Python 包。用户也可以直接在对话输入
+/iar-cspy 调用本技能。
 
 ## 工具地图
 
@@ -295,44 +297,131 @@ async function syncConfigFromSetup (ctx) {
   } catch {}
 }
 
-function registerProvisionRoute (ctx) {
+function currentConfigEntry (ctx) {
+  const editor = ctx.get('configEditor')
+  const entry = editor && typeof editor.entries === 'function'
+    ? editor.entries().find(item => String(item.id) === 'include:iar-cspy')
+    : undefined
+  return { editor, entry }
+}
+
+function configSnapshot (ctx) {
+  const { entry } = currentConfigEntry(ctx)
+  const value = entry && entry.options && entry.options.config ? entry.options.config : {}
+  const settings = resolveSettings(value)
+  return {
+    value,
+    effective: {
+      iarPath: settings.iarPath,
+      mcpPython: settings.mcpPython,
+      tempDir: settings.tempDir,
+      toolCallTimeoutMs: settings.timeout,
+      extraArgs: settings.extraArgs,
+    },
+    configured: settings.configured,
+    revision: Date.now(),
+  }
+}
+
+function applyConfigOps (current, ops) {
+  const allowed = new Set(['iarPath', 'mcpPython', 'tempDir', 'toolCallTimeoutMs', 'extraArgs'])
+  const next = { ...current }
+  for (const op of Array.isArray(ops) ? ops : []) {
+    const path = Array.isArray(op && op.path) ? op.path : []
+    if (path.length !== 1 || !allowed.has(path[0])) throw new Error('unsupported configuration path')
+    const key = path[0]
+    if (op.op === 'unset') {
+      delete next[key]
+      continue
+    }
+    if (op.op !== 'set') throw new Error('unsupported configuration operation')
+    if (key === 'toolCallTimeoutMs') {
+      const value = Number(op.value)
+      if (!Number.isFinite(value) || value <= 0) throw new Error('toolCallTimeoutMs must be a positive number')
+      next[key] = Math.floor(value)
+    } else if (key === 'extraArgs') {
+      if (!Array.isArray(op.value)) throw new Error('extraArgs must be an array')
+      next[key] = op.value.filter(item => typeof item === 'string' && item.trim() !== '').map(item => item.trim())
+    } else {
+      if (typeof op.value !== 'string') throw new Error(key + ' must be a string')
+      next[key] = op.value.trim()
+    }
+  }
+  return next
+}
+
+function registerRoutes (ctx) {
   const web = ctx.get('webServer')
   if (!web || typeof web.register !== 'function') return
+
+  const respond = (res, status, payload) => {
+    res.statusCode = status
+    res.setHeader('content-type', 'application/json; charset=utf-8')
+    res.setHeader('cache-control', 'no-store')
+    res.end(JSON.stringify(payload))
+  }
+
+  const admit = (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      respond(res, 405, { ok: false, error: 'GET or POST only' })
+      return false
+    }
+    const origin = req.headers.origin
+    if (origin) {
+      let sameOrigin = false
+      try { sameOrigin = new URL(origin).host === req.headers.host } catch {}
+      if (!sameOrigin) {
+        respond(res, 403, { ok: false, error: 'cross-origin request rejected' })
+        return false
+      }
+    }
+    if (req.method === 'POST') {
+      const type = String(req.headers['content-type'] || '')
+      if (!type.includes('application/json')) {
+        respond(res, 415, { ok: false, error: 'application/json required' })
+        return false
+      }
+    }
+    return true
+  }
+
+  ctx.effect(() => web.register({
+    kind: 'exact',
+    path: CONFIG_PATH,
+    async handler (req, res) {
+      if (!admit(req, res)) return
+      try {
+        if (req.method === 'GET') {
+          respond(res, 200, { ok: true, ...configSnapshot(ctx) })
+          return
+        }
+        const payload = JSON.parse((await readJsonBody(req)) || '{}')
+        const { editor, entry } = currentConfigEntry(ctx)
+        if (!editor || !entry) throw new Error('configuration entry is not addressable')
+        const next = applyConfigOps(entry.options.config || {}, payload.ops)
+        await editor.edit(entry, () => next)
+        respond(res, 200, { ok: true, ...configSnapshot(ctx) })
+      } catch (error) {
+        respond(res, 400, { ok: false, error: String(error) })
+      }
+    },
+  }), 'dsh-iar-cspy: config route')
+
   ctx.effect(() => web.register({
     kind: 'exact',
     path: PROVISION_PATH,
-    handler: async (req, res) => {
-      const respond = (status, payload) => {
-        res.statusCode = status
-        res.setHeader('content-type', 'application/json; charset=utf-8')
-        res.setHeader('cache-control', 'no-store')
-        res.end(JSON.stringify(payload))
+    async handler (req, res) {
+      if (!admit(req, res)) return
+      if (req.method !== 'POST') {
+        respond(res, 405, { ok: false, error: 'POST only' })
+        return
       }
       try {
-        if (req.method !== 'POST') {
-          respond(405, { ok: false, error: 'POST only' })
-          return
-        }
-        const origin = req.headers.origin
-        if (origin) {
-          let sameOrigin = false
-          try { sameOrigin = new URL(origin).host === req.headers.host } catch {}
-          if (!sameOrigin) {
-            respond(403, { ok: false, error: 'cross-origin request rejected' })
-            return
-          }
-        }
-        const type = String(req.headers['content-type'] || '')
-        if (!type.includes('application/json')) {
-          respond(415, { ok: false, error: 'application/json required' })
-          return
-        }
-        const text = await readJsonBody(req)
-        const payload = text ? JSON.parse(text) : {}
+        const payload = JSON.parse((await readJsonBody(req)) || '{}')
         const iarPath = typeof payload.iarPath === 'string' ? payload.iarPath.trim() : ''
         const result = await runSetup(iarPath)
         const setup = setupConfig()
-        respond(result.ok ? 200 : 500, {
+        respond(res, result.ok ? 200 : 500, {
           ok: result.ok,
           exitCode: result.exitCode ?? null,
           output: String(result.output || '').slice(-12000),
@@ -343,7 +432,7 @@ function registerProvisionRoute (ctx) {
           setTimeout(() => { void syncConfigFromSetup(ctx) }, 200)
         }
       } catch (error) {
-        respond(500, { ok: false, error: String(error) })
+        respond(res, 500, { ok: false, error: String(error) })
       }
     },
   }), 'dsh-iar-cspy: provision route')
@@ -366,7 +455,7 @@ function statusOf (settings) {
     stateDir: STATE_DIR,
     hint: settings.configured
       ? 'Configuration looks usable. The MCP tools are mcp__iar__*.'
-      : 'Open DSH sidebar Plugins -> dsh-iar-cspy -> row iar-cspy -> Configure, or run scripts/setup.ps1 from the plugin package.',
+      : 'Open DSH sidebar Plugins -> dsh-iar-cspy; the configuration form is on the plugin page above the component list. Or run scripts/setup.ps1 from the plugin package.',
   }
 }
 
@@ -379,7 +468,7 @@ export function apply (ctx, config) {
     timeout: settings.timeout,
   }
   ctx.provide('iarCspyConfig', service)
-  registerProvisionRoute(ctx)
+  registerRoutes(ctx)
 
   const skills = ctx.get('skills')
   if (skills && typeof skills.register === 'function') {

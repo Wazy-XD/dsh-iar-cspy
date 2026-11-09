@@ -18,8 +18,8 @@ VS Code 扩展和本插件建立在同一套基础设施上：构建走 IAR 的 
     直接启动 `<mcpPython> -m iar_cspy_mcp --iar-path <iarPath> [extraArgs]`。
     环境中的 `TEMP`/`TMP` 指向 `tempDir`，`toolCallTimeoutMs` 跟随插件配置，
     并开启自动重连（1 秒到 30 秒退避，最多 50 次）。
-- 配置入口在 DSH 侧边栏 **Plugins → dsh-iar-cspy → `iar-cspy` 行 → Configure**；
-  bundle 详情页的“配置”区只放安装/更新说明。留空字段自动探测：`iarPath` 依次看
+- 配置入口在 DSH 侧边栏 **Plugins → dsh-iar-cspy**：配置表单在插件页组件列表
+  上方，保存后自动重连；bundle 详情页的“配置”区只放安装/更新说明。留空字段自动探测：`iarPath` 依次看
   `IAR_INSTALL_PATH`、`%LOCALAPPDATA%\dsh-iar-cspy\config.json` 和常见安装目录；
   `mcpPython` 回退到 `%LOCALAPPDATA%\dsh-iar-cspy\venv\Scripts\python.exe`；
   `tempDir` 回退到 `%LOCALAPPDATA%\dsh-iar-cspy\tmp`。配置页的值优先于
@@ -32,7 +32,7 @@ VS Code 扩展和本插件建立在同一套基础设施上：构建走 IAR 的 
 
 ## 能力对照
 
-| 能力 | IAR VS Code 扩展 | dsh-iar-cspy 2.0.0 | 说明 |
+| 能力 | IAR VS Code 扩展 | dsh-iar-cspy 2.1.0 | 说明 |
 | --- | --- | --- | --- |
 | 选择工程/配置 | `iar-config.project-file` / `project-configuration` | 读取 `.ewp`，或 `iar-launch.ps1 -Configuration` | `project_status` 只在较新的 IDE Platform 上可用 |
 | 增量构建 | `iar-build: Build` | `project_build(project_path, config_name)` | 9.60.2 实测 |

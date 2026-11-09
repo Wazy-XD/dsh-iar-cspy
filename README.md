@@ -4,7 +4,7 @@
 
 ## 简介
 
-`dsh-iar-cspy` 2.0.0 是 DeepSeek Harness（DSH）的插件包，用来接入官方的
+`dsh-iar-cspy` 2.1.0 是 DeepSeek Harness（DSH）的插件包，用来接入官方的
 [IAR C-SPY MCP Server](https://github.com/iarsystems/cspy-mcp)。安装后，agent 可以在
 对话里编译 IAR Embedded Workbench 的 `.ewp` 工程，在模拟器或硬件探针上启动 C-SPY
 调试会话，并查看变量、寄存器、内存、调用栈和目标输出。IAR 安装路径、MCP 使用的
@@ -25,8 +25,8 @@ Python、临时目录和调用超时都可以在 DSH 的插件配置页里设置
 - **`iar-cspy` 技能**：用户和模型都可调用；任务涉及 IAR、EWARM、C-SPY、
   `.ewp`/`.eww`、iarbuild 时自动加载。内容包含工具地图、构建与调试流程、
   launch JSON 写法、EWARM 9.60.2 限制和安全注意事项。
-- **配置页**：DSH 侧边栏 **Plugins → dsh-iar-cspy**，在 `iar-cspy` 行点
-  **Configure**，设置 IAR 路径、
+- **配置页**：DSH 侧边栏 **Plugins → dsh-iar-cspy**，配置表单在插件页
+  组件列表上方；设置 IAR 路径、
   MCP Python、临时目录、超时和额外参数；留空字段自动探测。保存后 MCP 连接自动
   重载，不需要重启 DSH。
 - **`iar_cspy_status` 工具**：返回插件实际解析到的 `iarPath`、`mcpPython`、
@@ -60,10 +60,10 @@ Python、临时目录和调用超时都可以在 DSH 的插件配置页里设置
 在 DSH 里安装当前版本（GitHub Release 的 tgz）：
 
 ```
-plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.0.0/dsh-iar-cspy-2.0.0.tgz
+plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.1.0/dsh-iar-cspy-2.1.0.tgz
 ```
 
-也可以用本地 tgz，或等发布到 npm 后用 `target=dsh-iar-cspy@2.0.0`。安装完成后
+也可以用本地 tgz，或等发布到 npm 后用 `target=dsh-iar-cspy@2.1.0`。安装完成后
 bundle 会向 profile 插入两条 row：`iar-cspy`（Host 插件）和 `iar-cspy-mcp`
 （MCP client）。
 
@@ -106,8 +106,8 @@ $setup = Get-ChildItem "$env:USERPROFILE\.dsh\profiles\*\node_modules\dsh-iar-cs
 
 ### 3. 在 DSH 里配置
 
-打开 DSH 侧边栏的 **Plugins → dsh-iar-cspy**：字段在 `iar-cspy` 行的
-**Configure** 页上编辑；bundle 详情页的“配置”区提供安装/更新命令和说明。各字段：
+打开 DSH 侧边栏的 **Plugins → dsh-iar-cspy**：配置表单在插件页的组件列表
+上方，字段直接编辑后点“保存”；页面下方还有安装/更新按钮和说明。各字段：
 
 | 字段 | 作用 | 留空时 |
 | --- | --- | --- |
@@ -285,7 +285,7 @@ ProjectManager 接口老。以下官方工具会报 `Invalid method name`，不�
 **工具列表里没有 `mcp__iar__*`，或调用提示未配置。**
 先让 agent 调用 `iar_cspy_status`，它会给出解析后的路径和缺失项。常见原因是没跑
 `setup.ps1`，或配置页里的 `mcpPython` 不存在。补跑 setup、检查
-**Plugins → dsh-iar-cspy** 中 `iar-cspy` 行的配置，保存后等连接重载；必要时重新
+**Plugins → dsh-iar-cspy** 的配置表单，保存后等连接重载；必要时重新
 加载插件或新开会话。`iar-cspy-mcp` 行设置了 `failOnStartupError: false`，所以
 MCP 起不来不会让 DSH 整体崩溃，只会表现为工具缺失或调用失败。
 

@@ -21,6 +21,8 @@ window.__ModuleLoader__.load({
     const SETUP_COMMAND = '$s = Get-ChildItem "$env:USERPROFILE\\.dsh\\profiles\\*\\node_modules\\dsh-iar-cspy\\scripts\\setup.ps1" | Select-Object -First 1; & $s.FullName -IarPath "<IAR 安装目录>"'
     /** The Host route that runs setup.ps1; same-origin only and JSON-only. */
     const PROVISION_ENDPOINT = '/dsh-iar-cspy/provision'
+    /** The Host route that reads and writes the plugin configuration. */
+    const CONFIG_ENDPOINT = '/dsh-iar-cspy/config'
 
     /** Simplified Chinese copy; the source of truth for every visible string. */
     const zh = {
@@ -59,7 +61,7 @@ window.__ModuleLoader__.load({
       copyFailed: '无法访问剪贴板，请手动选择命令复制。',
       installNote: '安装完成后回到这里检查路径；配置保存后插件会自动重连，不需要重启 DSH。',
       configTitle: '配置',
-      bundleHint: '在下方行 “iar-cspy” 上点击“配置”编辑 IAR 路径、MCP Python、超时等字段。',
+      bundleHint: '在这里编辑 IAR 安装路径、MCP Python、临时目录、超时和额外参数；留空由插件自动探测。',
       rowInstallHint: 'MCP 的安装/更新见插件详情页的“配置”说明。',
       provisionAction: '安装 / 更新 MCP',
       provisionRunning: '正在安装…',
@@ -68,6 +70,10 @@ window.__ModuleLoader__.load({
       provisionNote: '首次安装会从 PyPI 和 GitHub 下载依赖，可能需要几分钟；请保持 DSH 运行，不要关闭页面。',
       installManual: '手动命令（可选）',
       installOutput: '安装输出（末尾部分）',
+      retry: '重试',
+      effectiveHint: '当前自动解析：',
+      skillTitle: '使用技能',
+      skillHint: '在对话输入框输入 /iar-cspy，或直接说“用 IAR 编译并调试这个工程”，agent 会加载 iar-cspy 技能并使用上面配置的 MCP。',
     }
 
     /** English copy, translated faithfully from the Chinese source. */
@@ -107,7 +113,7 @@ window.__ModuleLoader__.load({
       copyFailed: 'The clipboard is unavailable; select the command and copy it manually.',
       installNote: 'After installing, come back here to check the paths; a saved configuration reconnects the plugin automatically, no DSH restart needed.',
       configTitle: 'Configuration',
-      bundleHint: 'Click Configure on the "iar-cspy" row below to edit the IAR path, MCP Python, timeout and other fields.',
+      bundleHint: 'Edit the IAR path, MCP Python, temporary directory, timeout and extra arguments here; leave a field empty to let the plugin detect it.',
       rowInstallHint: 'For MCP installation or updates, see the "Configuration" note on the plugin details page.',
       provisionAction: 'Install / update MCP',
       provisionRunning: 'Installing…',
@@ -116,6 +122,10 @@ window.__ModuleLoader__.load({
       provisionNote: 'The first install downloads dependencies from PyPI and GitHub; this can take a few minutes. Keep DSH running and leave the page open.',
       installManual: 'Manual command (optional)',
       installOutput: 'Install output (tail)',
+      retry: 'Retry',
+      effectiveHint: 'Detected now:',
+      skillTitle: 'Use the skill',
+      skillHint: 'Type /iar-cspy in the composer, or ask "build and debug this project with IAR"; the agent loads the iar-cspy skill and uses the MCP configured above.',
     }
 
     const DICTIONARIES = { zh, en }
@@ -428,9 +438,76 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    /**
+     * A plugin-page configuration form backed by the Host config route.
+     *
+     * DSH hands a native writable `form` only to settings namespaces; a plain
+     * bundle's Config is not one, so the bundle page owns this adapter instead.
+     * The shape matches the native ConfigPageForm the row page would receive.
+     */
+    function useRemoteForm() {
+      const [state, setState] = useState({
+        status: 'loading',
+        value: {},
+        revision: 0,
+        effective: null,
+        error: '',
+      })
+
+      const load = async () => {
+        try {
+          const response = await fetch(CONFIG_ENDPOINT, { headers: { accept: 'application/json' } })
+          const payload = await response.json().catch(() => ({}))
+          if (!response.ok || payload.ok !== true) {
+            throw new Error(String(payload.error || ('HTTP ' + response.status)))
+          }
+          setState({
+            status: 'ready',
+            value: payload.value && typeof payload.value === 'object' ? payload.value : {},
+            revision: typeof payload.revision === 'number' ? payload.revision : Date.now(),
+            effective: payload.effective && typeof payload.effective === 'object' ? payload.effective : null,
+            error: '',
+          })
+        } catch (error) {
+          setState({ status: 'failed', value: {}, revision: 0, effective: null, error: errorText(error) })
+        }
+      }
+
+      useEffect(() => { void load() }, [])
+
+      const form = {
+        state: {
+          status: state.status,
+          value: state.value,
+          revision: state.revision,
+          writable: true,
+        },
+        mutate: async (operations) => {
+          const response = await fetch(CONFIG_ENDPOINT, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ops: operations }),
+          })
+          const payload = await response.json().catch(() => ({}))
+          if (!response.ok || payload.ok !== true) {
+            throw new Error(String(payload.error || ('HTTP ' + response.status)))
+          }
+          setState({
+            status: 'ready',
+            value: payload.value && typeof payload.value === 'object' ? payload.value : {},
+            revision: typeof payload.revision === 'number' ? payload.revision : Date.now(),
+            effective: payload.effective && typeof payload.effective === 'object' ? payload.effective : null,
+            error: '',
+          })
+          return true
+        },
+      }
+
+      return { state, form, reload: load }
+    }
+
     /** The shared install action: POSTs to the Host route that runs setup.ps1. */
-    function useProvision() {
-      const [state, setState] = useState('idle')
+    function useProvision() {      const [state, setState] = useState('idle')
       const [output, setOutput] = useState('')
       const [error, setError] = useState('')
       const [elapsed, setElapsed] = useState(0)
@@ -764,12 +841,51 @@ window.__ModuleLoader__.load({
           h('p', { key: 'title', style: styles.installTitle }, t('installTitle')),
           h(ProvisionControls, { key: 'controls', t, iarPath: draft.iarPath }),
         ]),
-        h('p', { key: 'install-link', style: styles.hint }, t('rowInstallHint')),
       ])
     }
 
     /**
-     * Register the row's configuration page and the bundle page's install card.
+     * The bundle page's configuration entry. The native row-page form is only
+     * supplied for DSH settings namespaces, so the bundle page drives the config
+     * through the Host route and renders the same field component.
+     */
+    function BundleConfigPage(props) {
+      const t = props.t || fallbackT
+      const remote = useRemoteForm()
+      if (props.view === 'summary') {
+        return h('span', { style: styles.summary }, t('summary'))
+      }
+      if (remote.state.status === 'loading') {
+        return h('p', { style: styles.note, role: 'status' }, t('loading'))
+      }
+      if (remote.state.status === 'failed') {
+        return h('div', { style: styles.provision }, [
+          h('p', { key: 'error', style: styles.error, role: 'status' }, `${t('unavailable')} ${remote.state.error}`),
+          h('button', {
+            key: 'retry',
+            type: 'button',
+            style: styles.secondaryButton,
+            onClick: () => { void remote.reload() },
+          }, t('retry')),
+        ])
+      }
+      const effective = remote.state.effective
+      return h('div', { style: styles.provision }, [
+        effective === null
+          ? null
+          : h('p', { key: 'effective', style: styles.hint }, `${t('effectiveHint')} IAR=${effective.iarPath || '-'}  Python=${effective.mcpPython || '-'}`),
+        h(IarSettingsPage, {
+          key: 'form',
+          ...props,
+          form: remote.form,
+          t,
+        }),
+        h('p', { key: 'skill', style: styles.hint }, t('skillHint')),
+      ])
+    }
+
+    /**
+     * Register the bundle page's configuration entry.
      *
      * `uiWorkspace` is optional (and may mount after this plugin), so the picker
      * is resolved once here and simply absent when the service is missing.
@@ -798,22 +914,12 @@ window.__ModuleLoader__.load({
         pickDirectory = undefined
       }
 
-      ctx.slots.inject('plugins.row.config', () => {
+      ctx.slots.inject('plugins.bundle.config', () => {
         const dispose = ctx.slots.register({
-          name: 'plugins.row.config',
-          key: ROW_CONFIG_KEY,
+          name: 'plugins.bundle.config',
+          key: PACKAGE_NAME,
           locale: NS,
-        }, props => h(IarRowConfig, { ...props, t, pickDirectory }))
-        return typeof dispose === 'function' ? dispose : () => {}
-      })
-
-      ctx.slots.inject('plugins.detail.section', () => {
-        const dispose = ctx.slots.register({
-          name: 'plugins.detail.section',
-          id: 'dsh-iar-cspy.config',
-          order: 40,
-          locale: NS,
-        }, props => h(IarDetailSection, { ...props, t }))
+        }, props => h(BundleConfigPage, { ...props, t, pickDirectory }))
         return typeof dispose === 'function' ? dispose : () => {}
       })
     }

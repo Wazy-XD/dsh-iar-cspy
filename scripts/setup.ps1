@@ -50,7 +50,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$SetupVersion = '2.0.0'
+$SetupVersion = '2.1.0'
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 function Write-Ok([string]$Message) { Write-Host "    $Message" -ForegroundColor Green }
@@ -377,7 +377,7 @@ Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor Cyan
 Write-Host '  1. Reload the dsh-iar-cspy plugin, or start a new DeepSeek Harness session, so the'
 Write-Host '     mcp__iar__ tools appear.'
-Write-Host '  2. The DSH plugin configuration (Plugins page -> dsh-iar-cspy -> Configure) overrides'
+Write-Host '  2. The DSH plugin configuration (Plugins page -> dsh-iar-cspy -> the form above'
 Write-Host '     config.json. config.json is only the auto-detection fallback.'
 Write-Host "  3. Diagnostics: $binRoot\doctor.ps1   (add -Probe to start and stop CSpyServer2)"
 Write-Host "  4. Launch helper: $binRoot\iar-launch.ps1 -Project <app.ewp>"
