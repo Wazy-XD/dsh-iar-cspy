@@ -168,6 +168,15 @@ launch 配置里的 workspaceFolder 变量按进程工作目录解析，不是�
    同样的命令行。这两个值就是 launch JSON 要用的 CPU/FPU。
 3. 大工程构建慢，插件已把 toolCallTimeoutMs 设为 10 分钟，不要调低。
 
+## 大工程构建：慢在哪、怎么省
+
+- 300+ 源文件的工程，4 路并行全量构建约 9 分钟；链接后还会额外生成上百 MB 的 .bin。只改一个
+  文件时不要触发全量重建，先只重编受影响文件再链接；只有工程文件或选项变化才重跑 -bootstrap。
+- DSH 沙箱会拦住编译器子进程的管道 I/O：表现为 iarbuild 报 "Build failed" 但 0 error、ninja
+  挂着没有子进程。这是沙箱拦的，不是工程问题；构建放到 danger-full-access 跑，不要反复重试。
+- project_build / startSession 的 Thrift 超时不等于失败：构建或烧写可能仍在后台继续。用产物
+  时间戳、data.output_tail 或目标串口日志判断，别急着重试或 cleanup。
+
 ## 调试流程
 
 1. 确认配置已构建。
@@ -192,6 +201,30 @@ launch 配置里的 workspaceFolder 变量按进程工作目录解析，不是�
 driver 名称沿用 launch.json：Simulator、64-bit Simulator、I-jet、CMSIS DAP、J-Link/J-Trace、
 ST-LINK、GDB Server、TI XDS 等。硬件探针通常还需要 --device=<型号> 和
 -p <EWARM>\arm\config\debugger\<驱动>.ddf，放进 driverOptions。
+
+## 硬件烧写：flash loader 与同步超时
+
+手写 launch JSON 时，烧写由 download 字段驱动，跟 driverOptions 无关：
+
+{"download": {"flashLoader": "<工程>.board", "deviceMacros": ["<setup>.mac"]}}
+
+- 老平台（IDE platform 9.5 之前）走 _legacy_launch.start()：只有读到 download.flashLoader
+  才会调用 Debugger.flashModule()。把 --flash_loader 放进 driverOptions 是无效的，现象是
+  "下载成功"但一个字节都没写、板子不启动。
+- 这两个字段对应 Embedded Workbench .ewd 里的 FlashLoadersV3（.board）和 MacFile（.mac）。
+- deviceMacros 在烧写前加载，用来提供 execUserFlashInit（复位、打开外设访问、关 MPU 等）。
+  没有它 flash loader 常常起不来。同一个 .mac 也可以再放进 setupMacros，给 execUserReset 用。
+- flashModule 是同步阻塞 RPC：1~2 MB 往往要几分钟，客户端会 Thrift 超时并返回失败，但后台仍
+  在烧。判断成功看目标串口上的 FlashErase/FlashWrite 日志，直到 "Flashload finished, ret:0"。
+  这期间不要重复 start，也不要 cleanup，会打断 loader。
+- 烧完启动：用 request=attach 的会话（suppressDownload）+ debugger_reset + debugger_go。
+  attach 不会重烧，reset 让 CPU 从复位向量干净启动。
+- Cortex-R52 不支持 vector catch：stopOnSymbol 会等满 10 秒再报 "was not seen to stop"，硬件
+  会话里不要设。
+- 目标处于 running 时 debugger_reset 报 "Reset while executing is not supported"，先
+  debugger_stop 再复位。
+- 每次 configure_and_start 都会先 strict cleanup 并重启 IarServiceLauncher + CSpyServer2
+  （几十秒）。反复失败会残留多个后台进程抢探针，必要时清理。
 
 ## 断点
 
