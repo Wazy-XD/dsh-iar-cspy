@@ -1,7 +1,7 @@
 {
   "name": "dsh-iar-cspy",
-  "version": "1.0.0",
-  "description": "DeepSeek Harness bundle for the official IAR C-SPY MCP server: build, debug and inspect Embedded Workbench projects from the agent, plus an iar-cspy skill for the 9.x legacy quirks.",
+  "version": "2.0.0",
+  "description": "DeepSeek Harness 插件：接入官方 IAR C-SPY MCP Server，在对话里编译、下载和调试 IAR Embedded Workbench 工程，并提供中文配置页与 iar-cspy 技能。",
   "keywords": [
     "dsh",
     "dsh-bundle",
@@ -27,25 +27,36 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
+      ]
     }
   },
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
     "scripts/*.ps1",
-    "launcher/**",
     "README.md",
-    "README.zh.md",
+    "README.en.md",
     "PARITY.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
   "publishConfig": {
     "access": "public"
   }

@@ -1,136 +1,425 @@
-const SKILL = String.raw`# IAR C-SPY debugger
-
-Use this when the task involves IAR Embedded Workbench: an .ewp/.eww project, C-SPY, an ARM, RISC-V
-or MSP430 firmware, a build from iarbuild, or debugging on the simulator or a hardware probe.
-
-## Connection
-
-The official IAR C-SPY MCP server is connected under the name "iar": every tool is
-mcp__iar__<name>, about 83 tools. It runs from the private environment created by setup.ps1
-(%LOCALAPPDATA%\dsh-iar-cspy) and is started automatically with the plugin.
-
-If the mcp__iar__ tools are missing, or every call fails with "not set up yet":
-
-1. %LOCALAPPDATA%\dsh-iar-cspy\bin\doctor.ps1 (or scripts\doctor.ps1 in the package) prints the
-   failing check.
-2. scripts\setup.ps1 -IarPath <EWARM root> provisions the environment; an existing harness session
-   may need a reload or a new session before the tools appear.
-
-## Tool map
-
-- project_*: build, project files/status, launch configuration (see the legacy notes below).
-- debugger_*: configure/start/stop a session, go/stop/reset, step over/into/out, wait for a core
-  state, expression evaluation, registers, modules, threads, cycle counter, log.
-- breakpoints_*: code breakpoints by symbol/source/address, data watchpoints, log breakpoints,
-  enable/remove/list.
-- contextmanager_*, symbols_*: call stack, locals, parameters, symbol lookup.
-- memory_*, disassembly_*, sourcelookup_*: read/write memory, disassemble a range, map an address
-  to source.
-- libsupport_*: target stdout/stdin (printf/scanf over semihosting or a terminal).
-- listwindow_*: trace/list windows when the driver supports tracing.
-- ide_services_* and projectmanager_call: escape hatches for IDE services and raw RPC.
-
-## Legacy products: EWARM 9.60.2 and older IDE platforms
-
-The backend of EWARM 9.60.2 reports IAR IDE Platform 9.3.5. Its ProjectManager is older than the
-one the MCP server targets, so these tools fail with "Invalid method name":
-
-- project_load_workspace and project_status (no HasWorkspace);
-- project_get_launch_config and project_configure_and_start_debug (no
-  GetLaunchConfigurationForConfiguration);
-- all options_* tools (9.60.2 ships no OptionsService).
-
-What still works, and how to use it:
-
-- Build with project_build(project_path=<absolute .ewp>, config_name="Debug"). It does not need
-  project_load_workspace first.
-- If a tool insists on a loaded project, call
-  projectmanager_call(method="LoadEwpFile", args_json="[\"<absolute .ewp>\", true]").
-- Debug with debugger_configure_and_start_session and a hand-written launch JSON. projectPath and
-  projectConfiguration are optional there; program, target, driver and driverOptions are required.
-
-The workspaceFolder variable in a launch config resolves to the process working directory, not the
-project directory. Always pass absolute paths.
-
-## Build loop
-
-1. project_build(project_path="D:\\work\\app\\app.ewp", config_name="Debug", num_parallel_builds=4,
-   max_output_lines=40). A failed build is not an exception: check data.succeeded and read
-   data.output_tail.
-2. The linker command in data.output_tail contains --cpu= and --fpu=; the map file under the
-   configuration's ListPath records the same command line. Use those values for the launch config.
-3. Builds of real projects take longer than the default 60 s MCP call timeout; this bundle sets
-   toolCallTimeoutMs to 10 minutes. Do not lower it.
-
-## Debug loop
-
-1. Make sure the configuration was built.
-2. Generate the launch JSON with the packaged script (recommended):
-   %LOCALAPPDATA%\dsh-iar-cspy\bin\iar-launch.ps1 -Project "D:\\work\\app\\app.ewp" -Configuration Debug
-   It reads the .ewp output paths, finds the .out, and takes --cpu/--fpu/--endian/--semihosting
-   from the linker map. -Driver, -Cpu, -Fpu, -Program and -DriverOptions override the detection;
-   -Build runs iarbuild first. The script prints JSON; write it to a file with -OutFile when the
-   agent should read it back from disk.
-3. debugger_configure_and_start_session(launch_json=<the JSON as a string>). It configures the
-   session, starts it, and runs to stopOnSymbol when set (reported as stopOnSymbol /
-   stopOnSymbolError).
-4. Verify with debugger_session_status and debugger_get_core_state, then inspect with
-   debugger_register_snapshot, contextmanager_get_locals/parameters/stack, symbols_lookup,
-   debugger_eval_expression, memory_read, disassembly_disassemble_range.
-5. Run with debugger_go or debugger_go_and_wait_for_core_state; step with debugger_step_over,
-   step_into, step_out. Read target output with libsupport_get_output.
-6. debugger_stop_session when the investigation is done. A managed backend is restarted on the
-   next start, so a new launch begins from a clean process.
-
-Minimal simulator launch JSON:
-
-{"type":"cspy","request":"launch","name":"sim","target":"arm","program":"D:\\work\\app\\Debug\\Exe\\app.out","driver":"Simulator","driverOptions":["--endian=little","--cpu=Cortex-M3","--fpu=None","--semihosting"],"stopOnSymbol":"main"}
-
-Driver names follow launch.json: Simulator, 64-bit Simulator, I-jet, CMSIS DAP, J-Link/J-Trace,
-ST-LINK, GDB Server, TI XDS, and so on. Hardware drivers normally need device options such as
---device=<part> and -p <EWARM>/arm/config/debugger/<driver>.ddf; pass them in driverOptions.
-
-## Breakpoints
-
-- breakpoints_set_code("main") or breakpoints_set_on_source(file, line, column) for a source line.
-- breakpoints_set_data(variable, access_type, size) for watchpoints (2 read, 3 write, 4 read/write).
-- breakpoints_set_log(location, message) logs and continues; read the lines with debugger_get_log.
-- breakpoints_get_all / breakpoints_enable / breakpoints_remove manage them.
-
-## Target console
-
-- libsupport_get_output returns text, hex, exit code and asserts; waiting_for_input says the target
-  blocks on stdin.
-- libsupport_push_input sends text; libsupport_wait_for_input_request blocks until the target asks.
-- Semihosting must be enabled in the launch/driver options for printf to arrive here.
-
-## Safety
-
-- A debug session pauses, resets and programs real hardware. Do not reset, flash or start a session
-  on a device the user has not put in a safe state, and stop sessions you opened.
-- Hardware drivers with a flash loader program the target; confirm with the user before a first
-  flash on an unfamiliar board.
-- Keep the user's IAR IDE out of the picture: do not claim the IDE window shows the agent's
-  session; this server drives its own C-SPY backend.
-`
+import z from '@deepseek-ai/schemastery'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const name = 'dsh-iar-cspy'
 
-/**
- * Registers the `iar-cspy` skill when the skill registry is mounted. The MCP connection itself is a
- * separate row (see cordis.patch.yml), so this plugin stays optional and never blocks the connection.
- */
-export function apply (ctx) {
-    const skills = ctx.get('skills')
-    if (!skills || typeof skills.register !== 'function') {
+const IS_WINDOWS = process.platform === 'win32'
+const STATE_DIR = process.env.DSH_IAR_CSPY_HOME
+  || (process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'dsh-iar-cspy') : join(process.env.HOME || process.env.USERPROFILE || '.', '.dsh-iar-cspy'))
+const SETUP_SCRIPT = fileURLToPath(new URL('./scripts/setup.ps1', import.meta.url))
+const PROVISION_PATH = '/dsh-iar-cspy/provision'
+
+export const Config = z.object({
+  iarPath: z.string().default(''),
+  mcpPython: z.string().default(''),
+  tempDir: z.string().default(''),
+  toolCallTimeoutMs: z.number().default(600000),
+  extraArgs: z.array(z.string()).default([]),
+})
+
+function setupConfig () {
+  try {
+    return JSON.parse(readFileSync(join(STATE_DIR, 'config.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function isIarRoot (root) {
+  return Boolean(root)
+    && existsSync(join(root, 'common', 'bin', 'CSpyServer2.exe'))
+    && existsSync(join(root, 'common', 'bin', 'IarServiceLauncher.exe'))
+}
+
+function detectIarPath () {
+  const setup = setupConfig()
+  const candidates = [process.env.IAR_INSTALL_PATH, setup.iarPath]
+  const programFiles = process.env.ProgramFiles
+  const programFilesX86 = process.env['ProgramFiles(x86)']
+  const roots = [
+    programFiles ? join(programFiles, 'IAR Systems') : '',
+    programFilesX86 ? join(programFilesX86, 'IAR Systems') : '',
+    'C:\\iar',
+    'C:\\IAR',
+    'D:\\iar',
+    'D:\\IAR',
+  ]
+  for (const root of roots) {
+    if (!root || !existsSync(root)) continue
+    try {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (entry.isDirectory()) candidates.push(join(root, entry.name))
+      }
+    } catch {}
+  }
+  const found = candidates.filter(candidate => isIarRoot(candidate))
+  found.sort((left, right) => right.localeCompare(left))
+  return found[0] || ''
+}
+
+function detectMcpPython () {
+  const setup = setupConfig()
+  const candidates = [setup.mcpPython, join(STATE_DIR, 'venv', 'Scripts', 'python.exe')]
+  return candidates.find(candidate => candidate && existsSync(candidate)) || ''
+}
+
+function resolveSettings (config) {
+  const iarPath = String(config?.iarPath || '').trim() || detectIarPath()
+  const mcpPython = String(config?.mcpPython || '').trim() || detectMcpPython()
+  const tempDir = String(config?.tempDir || '').trim() || join(STATE_DIR, 'tmp')
+  const rawTimeout = Number(config?.toolCallTimeoutMs)
+  const timeout = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.min(Math.floor(rawTimeout), 86400000) : 600000
+  const extraArgs = Array.isArray(config?.extraArgs) ? config.extraArgs.filter(arg => typeof arg === 'string' && arg.length > 0) : []
+
+  const env = { TEMP: tempDir, TMP: tempDir }
+  if (iarPath) env.IAR_INSTALL_PATH = iarPath
+
+  let command
+  let args
+  if (mcpPython && existsSync(mcpPython)) {
+    command = mcpPython
+    args = ['-m', 'iar_cspy_mcp']
+    if (iarPath) args.push('--iar-path', iarPath)
+    args.push(...extraArgs)
+  } else if (IS_WINDOWS) {
+    command = 'C:\\Windows\\System32\\cmd.exe'
+    args = ['/d', '/c', 'echo dsh-iar-cspy: MCP Python is not configured, open Plugins -> dsh-iar-cspy -> settings 1>&2 & exit 1']
+  } else {
+    command = '/bin/sh'
+    args = ['-c', 'echo "dsh-iar-cspy: MCP Python is not configured, open Plugins -> dsh-iar-cspy -> settings" 1>&2; exit 1']
+  }
+
+  return {
+    command,
+    args,
+    env,
+    timeout,
+    configured: Boolean(mcpPython && iarPath),
+    iarPath,
+    mcpPython,
+    tempDir,
+    extraArgs,
+  }
+}
+
+const SKILL = String.raw`# IAR C-SPY 调试器
+
+当任务涉及 IAR Embedded Workbench（EWARM）、C-SPY、.ewp/.eww 工程、iarbuild、ARM/RISC-V/MSP430
+固件，或者需要在模拟器/硬件探针上编译、下载、调试时，使用本技能。
+
+## 入口与连接
+
+官方 IAR C-SPY MCP Server 以 MCP 名称 "iar" 接入，工具形如 mcp__iar__*，共 83 个。
+插件设置里可以配置 IAR 安装路径、MCP 使用的 Python、临时目录和调用超时；留空时自动检测：
+
+- IAR 路径：先看环境变量 IAR_INSTALL_PATH，再读 %LOCALAPPDATA%\dsh-iar-cspy\config.json，
+  最后扫描常见安装目录（需要 common\bin\CSpyServer2.exe 和 IarServiceLauncher.exe）。
+- MCP Python：%LOCALAPPDATA%\dsh-iar-cspy\venv\Scripts\python.exe。
+- 临时目录：%LOCALAPPDATA%\dsh-iar-cspy\tmp。
+- 超时默认 600000 毫秒（10 分钟），因为真实工程构建经常超过 60 秒。
+
+如果 mcp__iar__* 工具不存在，先调用 iar_cspy_status 查看解析后的路径和缺失项；再让用户到
+DSH 侧边栏 Plugins -> dsh-iar-cspy，在 iar-cspy 行的 Configure 页检查路径。插件详情页和配置页
+都有“安装 / 更新 MCP”按钮，点击后宿主运行 setup.ps1、显示输出并自动重连；也可以手动运行
+插件包内的 scripts\setup.ps1。插件本身不安装 Python 包。
+
+## 工具地图
+
+- project_*：构建工程、工程文件/状态、launch 配置（老平台限制见下）。
+- debugger_*：配置/启动/停止会话，运行/暂停/复位，单步，等待核状态，表达式求值，寄存器，
+  模块，线程，周期计数，调试日志。
+- breakpoints_*：按符号/源码行/地址下代码断点，数据观察点，日志断点，启用/删除/列表。
+- contextmanager_*、symbols_*：调用栈、局部变量、参数、符号查找。
+- memory_*、disassembly_*、sourcelookup_*：读写内存、反汇编、地址映射到源码。
+- libsupport_*：目标 stdout/stdin（semihosting 或终端 printf/scanf）。
+- listwindow_*：支持 trace 的驱动上的跟踪/列表窗口。
+- ide_services_*、projectmanager_call：IDE 服务和原始 RPC 的兜底入口。
+
+## EWARM 9.60.2 等老平台（IAR IDE Platform 9.5 之前）
+
+9.60.2 后端报告 IAR IDE Platform 9.3.5，缺少以下 ProjectManager 方法，这些工具会报
+"Invalid method name"，不要反复重试：
+
+- project_load_workspace、project_status：缺 HasWorkspace。
+- project_get_launch_config、project_configure_and_start_debug：缺
+  GetLaunchConfigurationForConfiguration。
+- options_*：9.60.2 没有 OptionsService。
+
+可用的替代路径：
+
+- 直接 project_build(project_path=<绝对 .ewp>, config_name="Debug")，不需要先 load。
+- 如果某个工具坚持要先加载工程：
+  projectmanager_call(method="LoadEwpFile", args_json="[\"<绝对 .ewp>\", true]")。
+- 调试用 debugger_configure_and_start_session + 手写 launch JSON；program、target、driver、
+  driverOptions 四个字段必填。
+
+launch 配置里的 workspaceFolder 变量按进程工作目录解析，不是工程目录；始终传绝对路径。
+
+## 构建流程
+
+1. project_build(project_path=绝对路径, config_name="Debug", num_parallel_builds=4,
+   max_output_lines=40)。构建失败不会抛异常：看 data.succeeded 和 data.output_tail。
+2. data.output_tail 里的链接命令包含 --cpu= 和 --fpu=；配置 ListPath 下的 .map 文件也记录了
+   同样的命令行。这两个值就是 launch JSON 要用的 CPU/FPU。
+3. 大工程构建慢，插件已把 toolCallTimeoutMs 设为 10 分钟，不要调低。
+
+## 调试流程
+
+1. 确认配置已构建。
+2. 生成 launch JSON（推荐）：
+   %LOCALAPPDATA%\dsh-iar-cspy\bin\iar-launch.ps1 -Project "D:\work\app\app.ewp" -Configuration Debug
+   脚本读取 .ewp 的输出路径、找到 .out，并从 link map 取 --cpu/--fpu/端序/semihosting。
+   可用 -Driver、-Cpu、-Fpu、-Program、-DriverOptions 覆盖；-Build 会先跑 iarbuild。
+   需要文件时加 -OutFile。
+3. debugger_configure_and_start_session(launch_json=<JSON 字符串>)。设置 stopOnSymbol 时会
+   自动运行到该符号（结果在 stopOnSymbol / stopOnSymbolError）。
+4. 用 debugger_session_status、debugger_get_core_state 确认状态；再用
+   debugger_register_snapshot、contextmanager_get_locals/parameters/stack、symbols_lookup、
+   debugger_eval_expression、memory_read、disassembly_disassemble_range 观察。
+5. 运行用 debugger_go 或 debugger_go_and_wait_for_core_state；单步用 debugger_step_over、
+   step_into、step_out。目标输出用 libsupport_get_output 读。
+6. 结束用 debugger_stop_session。托管后端会在下次启动时重建，新的 launch 从干净进程开始。
+
+最小模拟器 launch JSON：
+
+{"type":"cspy","request":"launch","name":"sim","target":"arm","program":"D:\\work\\app\\Debug\\Exe\\app.out","driver":"Simulator","driverOptions":["--endian=little","--cpu=Cortex-M3","--fpu=None","--semihosting"],"stopOnSymbol":"main"}
+
+driver 名称沿用 launch.json：Simulator、64-bit Simulator、I-jet、CMSIS DAP、J-Link/J-Trace、
+ST-LINK、GDB Server、TI XDS 等。硬件探针通常还需要 --device=<型号> 和
+-p <EWARM>\arm\config\debugger\<驱动>.ddf，放进 driverOptions。
+
+## 断点
+
+- breakpoints_set_code("main") 或 breakpoints_set_on_source(file, line, column) 下源码断点。
+- breakpoints_set_data(variable, access_type, size) 下观察点（2 读、3 写、4 读写）。
+- breakpoints_set_log(location, message) 打印后继续；用 debugger_get_log 读日志。
+- breakpoints_get_all / breakpoints_enable / breakpoints_remove 管理断点。
+
+## 目标控制台
+
+- libsupport_get_output 返回文本、十六进制、退出码和断言；waiting_for_input 表示目标在等 stdin。
+- libsupport_push_input 发送文本；libsupport_wait_for_input_request 等到目标请求输入。
+- printf 走 semihosting 或终端插件，launch/driver 选项里要相应打开。
+
+## 安全
+
+- 调试会话会暂停、复位、烧写真实硬件。不要在用户没有准备好的设备上复位、烧写或启动会话；
+  自己开的会话结束时要关闭。
+- 带 flash loader 的硬件驱动会真正写目标；第一次在不熟悉的板子上烧写前先向用户确认。
+- 这是独立的 C-SPY 后端，不会出现在用户的 IAR IDE 窗口里，不要声称 IDE 里能看到调试会话。
+`
+
+function readJsonBody (req, limit = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0
+    const chunks = []
+    req.on('data', chunk => {
+      size += chunk.length
+      if (size > limit) {
+        reject(new Error('request body is too large'))
+        req.destroy()
         return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+}
+
+function runSetup (iarPath) {
+  return new Promise(resolve => {
+    if (!existsSync(SETUP_SCRIPT)) {
+      resolve({ ok: false, output: 'setup.ps1 not found at ' + SETUP_SCRIPT })
+      return
     }
+    const systemRoot = process.env.SystemRoot || 'C:\\Windows'
+    const powershell = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    const command = existsSync(powershell) ? powershell : 'powershell.exe'
+    const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SETUP_SCRIPT]
+    if (iarPath) args.push('-IarPath', iarPath)
+    let child
+    try {
+      mkdirSync(STATE_DIR, { recursive: true })
+      child = spawn(command, args, { cwd: STATE_DIR, windowsHide: true })
+    } catch (error) {
+      resolve({ ok: false, output: String(error) })
+      return
+    }
+    let output = ''
+    const append = chunk => {
+      output += chunk.toString('utf8')
+      if (output.length > 400000) output = output.slice(-400000)
+    }
+    child.stdout.on('data', append)
+    child.stderr.on('data', append)
+    const timer = setTimeout(() => {
+      try { child.kill() } catch {}
+    }, 15 * 60 * 1000)
+    child.on('error', error => {
+      clearTimeout(timer)
+      resolve({ ok: false, output: output + '\n' + String(error) })
+    })
+    child.on('close', code => {
+      clearTimeout(timer)
+      resolve({ ok: code === 0, exitCode: code, output })
+    })
+  })
+}
+
+async function syncConfigFromSetup (ctx) {
+  const setup = setupConfig()
+  if (!setup.mcpPython && !setup.iarPath) return
+  const editor = ctx.get('configEditor')
+  const entry = editor && typeof editor.entries === 'function'
+    ? editor.entries().find(item => String(item.id) === 'include:iar-cspy')
+    : undefined
+  if (!editor || !entry) return
+  const current = entry.options.config || {}
+  const next = { ...current }
+  let changed = false
+  if (setup.iarPath && setup.iarPath !== current.iarPath) {
+    next.iarPath = setup.iarPath
+    changed = true
+  }
+  if (setup.mcpPython && setup.mcpPython !== current.mcpPython) {
+    next.mcpPython = setup.mcpPython
+    changed = true
+  }
+  if (!changed) return
+  try {
+    await editor.edit(entry, () => next)
+  } catch {}
+}
+
+function registerProvisionRoute (ctx) {
+  const web = ctx.get('webServer')
+  if (!web || typeof web.register !== 'function') return
+  ctx.effect(() => web.register({
+    kind: 'exact',
+    path: PROVISION_PATH,
+    handler: async (req, res) => {
+      const respond = (status, payload) => {
+        res.statusCode = status
+        res.setHeader('content-type', 'application/json; charset=utf-8')
+        res.setHeader('cache-control', 'no-store')
+        res.end(JSON.stringify(payload))
+      }
+      try {
+        if (req.method !== 'POST') {
+          respond(405, { ok: false, error: 'POST only' })
+          return
+        }
+        const origin = req.headers.origin
+        if (origin) {
+          let sameOrigin = false
+          try { sameOrigin = new URL(origin).host === req.headers.host } catch {}
+          if (!sameOrigin) {
+            respond(403, { ok: false, error: 'cross-origin request rejected' })
+            return
+          }
+        }
+        const type = String(req.headers['content-type'] || '')
+        if (!type.includes('application/json')) {
+          respond(415, { ok: false, error: 'application/json required' })
+          return
+        }
+        const text = await readJsonBody(req)
+        const payload = text ? JSON.parse(text) : {}
+        const iarPath = typeof payload.iarPath === 'string' ? payload.iarPath.trim() : ''
+        const result = await runSetup(iarPath)
+        const setup = setupConfig()
+        respond(result.ok ? 200 : 500, {
+          ok: result.ok,
+          exitCode: result.exitCode ?? null,
+          output: String(result.output || '').slice(-12000),
+          mcpPython: setup.mcpPython || '',
+          iarPath: setup.iarPath || '',
+        })
+        if (result.ok) {
+          setTimeout(() => { void syncConfigFromSetup(ctx) }, 200)
+        }
+      } catch (error) {
+        respond(500, { ok: false, error: String(error) })
+      }
+    },
+  }), 'dsh-iar-cspy: provision route')
+}
+
+function statusOf (settings) {
+  const setup = setupConfig()
+  return {
+    configured: settings.configured,
+    iarPath: settings.iarPath || '',
+    iarPathSource: settings.iarPath
+      ? (String(setup.iarPath || '') === settings.iarPath ? 'setup-config' : 'detected')
+      : 'missing',
+    iarExecutables: settings.iarPath ? isIarRoot(settings.iarPath) : false,
+    mcpPython: settings.mcpPython || '',
+    mcpPythonExists: Boolean(settings.mcpPython && existsSync(settings.mcpPython)),
+    tempDir: settings.tempDir,
+    toolCallTimeoutMs: settings.timeout,
+    extraArgs: settings.extraArgs,
+    stateDir: STATE_DIR,
+    hint: settings.configured
+      ? 'Configuration looks usable. The MCP tools are mcp__iar__*.'
+      : 'Open DSH sidebar Plugins -> dsh-iar-cspy -> row iar-cspy -> Configure, or run scripts/setup.ps1 from the plugin package.',
+  }
+}
+
+export function apply (ctx, config) {
+  const settings = resolveSettings(config)
+  const service = {
+    command: settings.command,
+    args: settings.args,
+    env: settings.env,
+    timeout: settings.timeout,
+  }
+  ctx.provide('iarCspyConfig', service)
+  registerProvisionRoute(ctx)
+
+  const skills = ctx.get('skills')
+  if (skills && typeof skills.register === 'function') {
     ctx.effect(() => skills.register({
-        name: 'iar-cspy',
-        description: 'Drive IAR Embedded Workbench through the official C-SPY MCP server: build an .ewp project, generate a launch configuration, run and inspect a simulator or hardware debug session.',
-        whenToUse: 'A task mentions IAR Embedded Workbench, C-SPY, EWARM, an .ewp/.eww project, iarbuild, or debugging firmware on a simulator or probe.',
-        source: 'runtime',
-        content: SKILL,
-        invocation: { modelInvocable: true, userInvocable: true },
+      name: 'iar-cspy',
+      description: '通过官方 IAR C-SPY MCP Server 编译和调试 IAR Embedded Workbench 工程：构建 .ewp、生成 launch 配置、启动模拟器或硬件调试、查看变量/寄存器/内存/目标输出。',
+      whenToUse: '任务涉及 IAR Embedded Workbench、C-SPY、EWARM、.ewp/.eww 工程、iarbuild，或需要编译/调试 ARM、RISC-V、MSP430 固件。',
+      source: 'runtime',
+      content: SKILL,
+      invocation: { modelInvocable: true, userInvocable: true },
     }))
+  }
+
+  const tools = ctx.get('tools')
+  if (tools && typeof tools.register === 'function') {
+    ctx.effect(() => tools.register({
+      name: 'iar_cspy_status',
+      description: 'Report how the dsh-iar-cspy plugin resolved the IAR installation, MCP Python and timeout, and what is missing.',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            configured: { type: 'boolean' },
+            iarPath: { type: 'string' },
+            iarPathSource: { type: 'string' },
+            iarExecutables: { type: 'boolean' },
+            mcpPython: { type: 'string' },
+            mcpPythonExists: { type: 'boolean' },
+            tempDir: { type: 'string' },
+            toolCallTimeoutMs: { type: 'number' },
+            extraArgs: { type: 'array', items: { type: 'string' } },
+            stateDir: { type: 'string' },
+            hint: { type: 'string' },
+          },
+          required: ['configured', 'tempDir', 'toolCallTimeoutMs', 'stateDir', 'hint'],
+        },
+        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+      },
+      execute: async () => statusOf(settings),
+    }))
+  }
 }
