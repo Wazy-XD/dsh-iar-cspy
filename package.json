@@ -1,6 +1,6 @@
 {
   "name": "dsh-iar-cspy",
-  "version": "2.1.0",
+  "version": "0.0.2",
   "description": "DeepSeek Harness 插件：接入官方 IAR C-SPY MCP Server，在对话里编译、下载和调试 IAR Embedded Workbench 工程，并提供中文配置页与 iar-cspy 技能。",
   "keywords": [
     "dsh",

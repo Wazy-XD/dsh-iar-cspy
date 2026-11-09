@@ -50,7 +50,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$SetupVersion = '2.1.0'
+$SetupVersion = '0.0.2'
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 function Write-Ok([string]$Message) { Write-Host "    $Message" -ForegroundColor Green }

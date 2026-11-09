@@ -32,7 +32,7 @@ VS Code 扩展和本插件建立在同一套基础设施上：构建走 IAR 的 
 
 ## 能力对照
 
-| 能力 | IAR VS Code 扩展 | dsh-iar-cspy 2.1.0 | 说明 |
+| 能力 | IAR VS Code 扩展 | dsh-iar-cspy 0.0.2 | 说明 |
 | --- | --- | --- | --- |
 | 选择工程/配置 | `iar-config.project-file` / `project-configuration` | 读取 `.ewp`，或 `iar-launch.ps1 -Configuration` | `project_status` 只在较新的 IDE Platform 上可用 |
 | 增量构建 | `iar-build: Build` | `project_build(project_path, config_name)` | 9.60.2 实测 |

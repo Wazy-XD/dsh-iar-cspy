@@ -4,7 +4,7 @@
 
 ## Introduction
 
-`dsh-iar-cspy` 2.1.0 is a DeepSeek Harness (DSH) bundle for the official
+`dsh-iar-cspy` 0.0.2 is a DeepSeek Harness (DSH) bundle for the official
 [IAR C-SPY MCP server](https://github.com/iarsystems/cspy-mcp). Once installed, the
 agent can build IAR Embedded Workbench `.ewp` projects in the conversation, start
 C-SPY debug sessions on the simulator or a hardware probe, and inspect variables,
@@ -68,15 +68,16 @@ IAR VS Code extensions.
 
 ### 1. Install the bundle
 
-Install the current version in DSH (the GitHub release tgz):
+Install from npm in DSH (recommended):
 
 ```
-plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.1.0/dsh-iar-cspy-2.1.0.tgz
+plugin_manager install_bundle target=dsh-iar-cspy
 ```
 
-A local tgz also works, as does `target=dsh-iar-cspy@2.1.0` once it is published
-to npm. After installation the bundle inserts two rows into the profile:
-`iar-cspy` (the host plugin) and `iar-cspy-mcp` (the MCP client).
+Pin a version with `target=dsh-iar-cspy@0.0.2`, or use the GitHub release tgz
+(`.../releases/download/v0.0.2/dsh-iar-cspy-0.0.2.tgz`) or a local tgz. After
+installation the bundle inserts two rows into the profile: `iar-cspy` (the host
+plugin) and `iar-cspy-mcp` (the MCP client).
 
 ### 2. Prepare the Python environment for MCP
 

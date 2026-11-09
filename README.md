@@ -4,7 +4,7 @@
 
 ## 简介
 
-`dsh-iar-cspy` 2.1.0 是 DeepSeek Harness（DSH）的插件包，用来接入官方的
+`dsh-iar-cspy` 0.0.2 是 DeepSeek Harness（DSH）的插件包，用来接入官方的
 [IAR C-SPY MCP Server](https://github.com/iarsystems/cspy-mcp)。安装后，agent 可以在
 对话里编译 IAR Embedded Workbench 的 `.ewp` 工程，在模拟器或硬件探针上启动 C-SPY
 调试会话，并查看变量、寄存器、内存、调用栈和目标输出。IAR 安装路径、MCP 使用的
@@ -57,15 +57,16 @@ Python、临时目录和调用超时都可以在 DSH 的插件配置页里设置
 
 ### 1. 安装 bundle
 
-在 DSH 里安装当前版本（GitHub Release 的 tgz）：
+在 DSH 里从 npm 安装（推荐）：
 
 ```
-plugin_manager install_bundle target=https://github.com/Wazy-XD/dsh-iar-cspy/releases/download/v2.1.0/dsh-iar-cspy-2.1.0.tgz
+plugin_manager install_bundle target=dsh-iar-cspy
 ```
 
-也可以用本地 tgz，或等发布到 npm 后用 `target=dsh-iar-cspy@2.1.0`。安装完成后
-bundle 会向 profile 插入两条 row：`iar-cspy`（Host 插件）和 `iar-cspy-mcp`
-（MCP client）。
+需要固定版本时写 `target=dsh-iar-cspy@0.0.2`；也可以下载 GitHub Release 的
+tgz（`.../releases/download/v0.0.2/dsh-iar-cspy-0.0.2.tgz`）或本地 tgz 安装。
+安装完成后 bundle 会向 profile 插入两条 row：`iar-cspy`（Host 插件）和
+`iar-cspy-mcp`（MCP client）。
 
 ### 2. 准备 MCP 的 Python 环境
 
