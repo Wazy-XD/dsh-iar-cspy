@@ -75,7 +75,9 @@ function resolveSettings (config) {
   const timeout = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.min(Math.floor(rawTimeout), 86400000) : 600000
   const extraArgs = Array.isArray(config?.extraArgs) ? config.extraArgs.filter(arg => typeof arg === 'string' && arg.length > 0) : []
 
-  const env = { TEMP: tempDir, TMP: tempDir }
+  // Keep the backend Thrift RPC timeout in sync with the DSH tool-call timeout,
+  // otherwise long RPCs like BuildProject/flashModule fail with "Thrift RPC failed: timed out".
+  const env = { TEMP: tempDir, TMP: tempDir, THRIFT_TIMEOUT_MS: String(timeout) }
   if (iarPath) env.IAR_INSTALL_PATH = iarPath
 
   let command
