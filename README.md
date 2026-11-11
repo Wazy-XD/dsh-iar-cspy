@@ -175,6 +175,9 @@ project_build(project_path="D:\work\app\app.ewp", config_name="Debug", num_paral
 真实工程的构建时间经常超过 MCP 默认的 60 秒，所以本插件把
 `toolCallTimeoutMs` 默认设为 10 分钟；特别大的工程可以在配置页继续调高。
 
+插件启动 MCP 时会把该值同步注入后端 Thrift RPC 超时（`THRIFT_TIMEOUT_MS`），
+所以 `project_build`、烧写这类阻塞调用不会再被 MCP 内部默认的 15 秒判超时。
+
 `project_build` 对应增量的 `BuildProject`。需要全量重建或清理时，用 IAR 自己的
 `iarbuild.exe`：
 

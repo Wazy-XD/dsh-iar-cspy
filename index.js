@@ -75,7 +75,9 @@ function resolveSettings (config) {
   const timeout = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.min(Math.floor(rawTimeout), 86400000) : 600000
   const extraArgs = Array.isArray(config?.extraArgs) ? config.extraArgs.filter(arg => typeof arg === 'string' && arg.length > 0) : []
 
-  const env = { TEMP: tempDir, TMP: tempDir }
+  // Keep the backend Thrift RPC timeout in sync with the DSH tool-call timeout,
+  // otherwise long RPCs like BuildProject/flashModule fail with "Thrift RPC failed: timed out".
+  const env = { TEMP: tempDir, TMP: tempDir, THRIFT_TIMEOUT_MS: String(timeout) }
   if (iarPath) env.IAR_INSTALL_PATH = iarPath
 
   let command
@@ -384,8 +386,14 @@ function applyConfigOps (current, ops) {
 }
 
 function registerRoutes (ctx) {
-  const web = ctx.get('webServer')
-  if (!web || typeof web.register !== 'function') return
+  // The Host's webServer service may not be live when this bundle applies, so register
+  // through ctx.inject as well as immediately. A one-shot ctx.get() left both routes
+  // unregistered when the service appeared later, and the settings form got HTTP 404.
+  const seen = new WeakSet()
+  const registerOn = (hostCtx) => {
+  const web = hostCtx.get('webServer')
+  if (!web || typeof web.register !== 'function' || seen.has(web)) return
+  seen.add(web)
 
   const respond = (res, status, payload) => {
     res.statusCode = status
@@ -418,7 +426,7 @@ function registerRoutes (ctx) {
     return true
   }
 
-  ctx.effect(() => web.register({
+  hostCtx.effect(() => web.register({
     kind: 'exact',
     path: CONFIG_PATH,
     async handler (req, res) {
@@ -440,7 +448,7 @@ function registerRoutes (ctx) {
     },
   }), 'dsh-iar-cspy: config route')
 
-  ctx.effect(() => web.register({
+  hostCtx.effect(() => web.register({
     kind: 'exact',
     path: PROVISION_PATH,
     async handler (req, res) {
@@ -469,6 +477,14 @@ function registerRoutes (ctx) {
       }
     },
   }), 'dsh-iar-cspy: provision route')
+  }
+
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (webCtx) => registerOn(webCtx))
+    registerOn(ctx)
+  } else {
+    registerOn(ctx)
+  }
 }
 
 function statusOf (settings) {

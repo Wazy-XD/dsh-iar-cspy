@@ -198,7 +198,10 @@ Skipping the load makes 9.60.2's ProjectManager answer `Unknown project`.
 A failed build is not an exception: the result is `ok=false`; read
 `data.succeeded` and `data.output_tail`. Real projects often build for longer than
 the MCP default of 60 seconds, so this plugin defaults `toolCallTimeoutMs` to
-10 minutes; raise it on the configuration page for very large projects.
+10 minutes; raise it on the configuration page for very large projects. The
+plugin also injects that value as the backend Thrift RPC timeout (`THRIFT_TIMEOUT_MS`),
+so blocking calls such as `project_build` and flash download no longer hit the MCP
+server's 15-second default.
 
 `project_build` maps to the incremental `BuildProject`. For a full rebuild or a
 clean, use IAR's own `iarbuild.exe`:
