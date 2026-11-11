@@ -386,8 +386,14 @@ function applyConfigOps (current, ops) {
 }
 
 function registerRoutes (ctx) {
-  const web = ctx.get('webServer')
-  if (!web || typeof web.register !== 'function') return
+  // The Host's webServer service may not be live when this bundle applies, so register
+  // through ctx.inject as well as immediately. A one-shot ctx.get() left both routes
+  // unregistered when the service appeared later, and the settings form got HTTP 404.
+  const seen = new WeakSet()
+  const registerOn = (hostCtx) => {
+  const web = hostCtx.get('webServer')
+  if (!web || typeof web.register !== 'function' || seen.has(web)) return
+  seen.add(web)
 
   const respond = (res, status, payload) => {
     res.statusCode = status
@@ -420,7 +426,7 @@ function registerRoutes (ctx) {
     return true
   }
 
-  ctx.effect(() => web.register({
+  hostCtx.effect(() => web.register({
     kind: 'exact',
     path: CONFIG_PATH,
     async handler (req, res) {
@@ -442,7 +448,7 @@ function registerRoutes (ctx) {
     },
   }), 'dsh-iar-cspy: config route')
 
-  ctx.effect(() => web.register({
+  hostCtx.effect(() => web.register({
     kind: 'exact',
     path: PROVISION_PATH,
     async handler (req, res) {
@@ -471,6 +477,14 @@ function registerRoutes (ctx) {
       }
     },
   }), 'dsh-iar-cspy: provision route')
+  }
+
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (webCtx) => registerOn(webCtx))
+    registerOn(ctx)
+  } else {
+    registerOn(ctx)
+  }
 }
 
 function statusOf (settings) {
